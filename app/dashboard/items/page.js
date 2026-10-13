@@ -85,7 +85,7 @@ export default function ItemsPage() {
           <label className="text-sm font-medium sm:col-span-2">Deskripsi
             <input className="input mt-1" required value={form.name || ''} onChange={set('name')} />
           </label>
-          <label className="text-sm font-medium">Saldo / Stok Awal
+          <label className="text-sm font-medium">Stock Awal
             <input className="input mt-1" type="number" min="0" value={form.saldo} onChange={set('saldo')} />
           </label>
           <div className="flex items-end gap-2 sm:justify-end">
@@ -107,7 +107,7 @@ export default function ItemsPage() {
               <th className="th">Kode</th>
               <th className="th">Deskripsi</th>
               <th className="th">Grup</th>
-              <th className="th text-right">Saldo</th>
+              <th className="th text-right">Stock</th>
               <th className="th" />
             </tr>
           </thead>
