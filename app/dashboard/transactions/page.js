@@ -7,7 +7,7 @@ import { exportTransactions } from '@/lib/exportExcel';
 export default function TransactionsPage() {
   const [rows, setRows] = useState([]);
   const [items, setItems] = useState([]);
-  const [form, setForm] = useState({ item_id: '', transaction_type: 'IN', quantity: 1, notes: '' });
+  const [form, setForm] = useState({ item_id: '', transaction_type: 'in', quantity: 1, notes: '' });
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,7 +36,7 @@ export default function TransactionsPage() {
     setBusy(true); setError(''); setInfo('');
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Menyertakan kolom 'type' dan 'transaction_type' sekaligus agar sesuai dengan database
+    // Mengirimkan 'in' atau 'out' dalam huruf kecil sesuai constraint database
     const { error: err } = await supabase.from('transactions').insert({
       item_id: parseInt(form.item_id, 10),
       type: form.transaction_type,
@@ -48,7 +48,7 @@ export default function TransactionsPage() {
     
     setBusy(false);
     if (err) return setError(err.message);
-    setForm({ item_id: '', transaction_type: 'IN', quantity: 1, notes: '' });
+    setForm({ item_id: '', transaction_type: 'in', quantity: 1, notes: '' });
     load();
   };
 
@@ -89,8 +89,8 @@ export default function TransactionsPage() {
           ))}
         </select>
         <select className="input" value={form.transaction_type} onChange={set('transaction_type')}>
-          <option value="IN">Masuk</option>
-          <option value="OUT">Keluar</option>
+          <option value="in">Masuk</option>
+          <option value="out">Keluar</option>
         </select>
         <input className="input" type="number" min="1" required value={form.quantity} onChange={set('quantity')} aria-label="Jumlah" />
         <input className="input" placeholder="Catatan" value={form.notes} onChange={set('notes')} />
@@ -110,23 +110,26 @@ export default function TransactionsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-stone-100">
-            {rows.map((t) => (
-              <tr key={t.id}>
-                <td className="td whitespace-nowrap">{new Date(t.timestamp || t.created_at).toLocaleString('id-ID')}</td>
-                <td className="td">
-                  <span className="font-medium">{t.items?.sku || '-'}</span>
-                  <span className="block text-xs text-stone-500">{t.items?.name || t.item_name || '-'}</span>
-                </td>
-                <td className="td">
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${(t.type || t.transaction_type) === 'IN' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                    {(t.type || t.transaction_type) === 'IN' ? 'Masuk' : 'Keluar'}
-                  </span>
-                </td>
-                <td className="td text-right font-semibold">{t.quantity}</td>
-                <td className="td">{t.profiles?.email || '-'}</td>
-                <td className="td text-stone-500">{t.notes}</td>
-              </tr>
-            ))}
+            {rows.map((t) => {
+              const txType = (t.type || t.transaction_type || '').toLowerCase();
+              return (
+                <tr key={t.id}>
+                  <td className="td whitespace-nowrap">{new Date(t.timestamp || t.created_at).toLocaleString('id-ID')}</td>
+                  <td className="td">
+                    <span className="font-medium">{t.items?.sku || '-'}</span>
+                    <span className="block text-xs text-stone-500">{t.items?.name || t.item_name || '-'}</span>
+                  </td>
+                  <td className="td">
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${txType === 'in' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {txType === 'in' ? 'Masuk' : 'Keluar'}
+                    </span>
+                  </td>
+                  <td className="td text-right font-semibold">{t.quantity}</td>
+                  <td className="td">{t.profiles?.email || '-'}</td>
+                  <td className="td text-stone-500">{t.notes}</td>
+                </tr>
+              );
+            })}
             {!rows.length && <tr><td className="td text-stone-500" colSpan={6}>Belum ada transaksi. Catat transaksi pertama di atas.</td></tr>}
           </tbody>
         </table>
