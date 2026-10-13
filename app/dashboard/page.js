@@ -11,7 +11,7 @@ export default function Overview() {
   useEffect(() => {
     (async () => {
       const [a, b] = await Promise.all([
-        supabase.from('items').select('*').order('item_code'),
+        supabase.from('items').select('*').order('sku'),
         supabase.from('transactions').select('transaction_type, quantity'),
       ]);
       if (a.error || b.error) return setError((a.error || b.error).message);
@@ -42,12 +42,23 @@ export default function Overview() {
       <section className="card overflow-x-auto">
         <h2 className="px-4 pt-4 font-semibold">Stok terkini</h2>
         <table className="mt-2 w-full">
-          <thead className="border-b border-stone-200"><tr><th className="th">Kode</th><th className="th">Deskripsi</th><th className="th">Grup</th><th className="th text-right">Saldo</th></tr></thead>
+          <thead className="border-b border-stone-200">
+            <tr>
+              <th className="th">Kode</th>
+              <th className="th">Deskripsi</th>
+              <th className="th">Kategori</th>
+              <th className="th text-right">Stock</th>
+            </tr>
+          </thead>
           <tbody className="divide-y divide-stone-100">
             {items.map((i) => (
-              <tr key={i.item_code}>
-                <td className="td font-medium">{i.item_code}</td><td className="td">{i.item_description}</td><td className="td">{i.stock_group}</td>
-                <td className={`td text-right font-semibold ${i.current_balance <= 10 ? 'text-red-600' : ''}`}>{i.current_balance}</td>
+              <tr key={i.sku || i.item_code}>
+                <td className="td font-medium">{i.sku || i.item_code}</td>
+                <td className="td">{i.name || i.description}</td>
+                <td className="td">{i.category || i.item_group || '-'}</td>
+                <td className={`td text-right font-semibold ${(i.saldo || 0) <= 10 ? 'text-red-600' : ''}`}>
+                  {i.saldo ?? 0}
+                </td>
               </tr>
             ))}
             {!items.length && <tr><td className="td text-stone-500" colSpan={4}>Belum ada barang. Tambahkan lewat menu Barang.</td></tr>}
