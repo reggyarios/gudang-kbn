@@ -24,7 +24,6 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     load();
-    // Mengambil id, sku, dan name dari tabel items untuk dropdown
     supabase.from('items').select('id, sku, name').order('sku').then(({ data }) => setItems(data || []));
     const ch = supabase.channel('tx-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, load)
@@ -37,9 +36,10 @@ export default function TransactionsPage() {
     setBusy(true); setError(''); setInfo('');
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Menyimpan menggunakan kolom asli database: item_id dan created_by
+    // Menyertakan kolom 'type' dan 'transaction_type' sekaligus agar sesuai dengan database
     const { error: err } = await supabase.from('transactions').insert({
       item_id: parseInt(form.item_id, 10),
+      type: form.transaction_type,
       transaction_type: form.transaction_type,
       quantity: parseInt(form.quantity, 10),
       notes: form.notes || null,
@@ -118,8 +118,8 @@ export default function TransactionsPage() {
                   <span className="block text-xs text-stone-500">{t.items?.name || t.item_name || '-'}</span>
                 </td>
                 <td className="td">
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${(t.transaction_type || t.type) === 'IN' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                    {(t.transaction_type || t.type) === 'IN' ? 'Masuk' : 'Keluar'}
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${(t.type || t.transaction_type) === 'IN' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                    {(t.type || t.transaction_type) === 'IN' ? 'Masuk' : 'Keluar'}
                   </span>
                 </td>
                 <td className="td text-right font-semibold">{t.quantity}</td>
