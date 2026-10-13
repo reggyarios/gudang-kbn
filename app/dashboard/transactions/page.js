@@ -24,7 +24,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     load();
-    supabase.from('items').select('sku, name, description, item_code').order('sku').then(({ data }) => setItems(data || []));
+    supabase.from('items').select('sku, name, description').order('sku').then(({ data }) => setItems(data || []));
     const ch = supabase.channel('tx-live')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, load)
       .subscribe();
@@ -35,14 +35,16 @@ export default function TransactionsPage() {
     e.preventDefault();
     setBusy(true); setError(''); setInfo('');
     const { data: { user } } = await supabase.auth.getUser();
+    
+    // Hanya mengirimkan kolom yang pasti ada di tabel transactions (sku, transaction_type, quantity, notes, user_id)
     const { error: err } = await supabase.from('transactions').insert({
       sku: form.sku,
-      item_code: form.sku,
       transaction_type: form.transaction_type,
       quantity: parseInt(form.quantity, 10),
       notes: form.notes || null,
       user_id: user?.id,
     });
+    
     setBusy(false);
     if (err) return setError(err.message);
     setForm({ ...form, quantity: 1, notes: '' });
@@ -82,7 +84,7 @@ export default function TransactionsPage() {
         <select className="input sm:col-span-2" required value={form.sku} onChange={set('sku')}>
           <option value="">Pilih barang</option>
           {items.map((i) => {
-            const code = i.sku || i.item_code;
+            const code = i.sku;
             const desc = i.name || i.description;
             return <option key={code} value={code}>{code} - {desc}</option>;
           })}
