@@ -12,18 +12,20 @@ export default function Overview() {
     (async () => {
       const [a, b] = await Promise.all([
         supabase.from('items').select('*').order('sku'),
-        supabase.from('transactions').select('transaction_type, quantity'),
+        supabase.from('transactions').select('transaction_type, type, quantity'),
       ]);
       if (a.error || b.error) return setError((a.error || b.error).message);
-      setItems(a.data); setTx(b.data);
+      setItems(a.data || []); 
+      setTx(b.data || []);
     })();
   }, []);
 
-  const sum = (t) => tx.filter((x) => x.transaction_type === t).reduce((n, x) => n + x.quantity, 0);
+  const sum = (t) => tx.filter((x) => (x.transaction_type || x.type || '').toLowerCase() === t.toLowerCase()).reduce((n, x) => n + x.quantity, 0);
+  
   const stats = [
     { label: 'Total barang', value: items.length, icon: Boxes },
-    { label: 'Unit masuk', value: sum('IN'), icon: ArrowDownToLine },
-    { label: 'Unit keluar', value: sum('OUT'), icon: ArrowUpFromLine },
+    { label: 'Unit masuk', value: sum('in'), icon: ArrowDownToLine },
+    { label: 'Unit keluar', value: sum('out'), icon: ArrowUpFromLine },
     { label: 'Jumlah transaksi', value: tx.length, icon: History },
   ];
 
