@@ -1,72 +1,175 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { Boxes, ArrowDownToLine, ArrowUpFromLine, History } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { Package, ArrowDownRight, ArrowUpRight, History, Edit2, Save, X } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 
-export default function Overview() {
+export default function DashboardOverviewPage() {
+  const [stats, setStats] = useState({ totalItems: 0, unitIn: 0, unitOut: 0, totalTx: 0 });
   const [items, setItems] = useState([]);
-  const [tx, setTx] = useState([]);
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const [editSaldo, setEditSaldo] = useState(0);
 
-  useEffect(() => {
-    (async () => {
-      const [a, b] = await Promise.all([
-        supabase.from('items').select('*').order('sku'),
-        supabase.from('transactions').select('transaction_type, type, quantity'),
-      ]);
-      if (a.error || b.error) return setError((a.error || b.error).message);
-      setItems(a.data || []); 
-      setTx(b.data || []);
-    })();
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    
+    // Fetch items
+    const { data: itemsData } = await supabase.from('items').select('*').order('sku');
+    // Fetch transactions
+    const { data: txData } = await supabase.from('transactions').select('item_id, type, transaction_type, quantity');
+
+    if (itemsData && txData) {
+      let unitIn = 0;
+      let unitOut = 0;
+
+      // Hitung akumulasi per item dari transaksi
+      const txMap = {};
+      txData.forEach(t => {
+        const type = (t.type || t.transaction_type || '').toLowerCase();
+        const qty = Number(t.quantity) || 0;
+        if (!txMap[t.item_id]) txMap[t.item_id] = 0;
+
+        if (type === 'in') {
+          unitIn += qty;
+          txMap[t.item_id] += qty;
+        } else if (type === 'out') {
+          unitOut += qty;
+          txMap[t.item_id] -= qty;
+        }
+      });
+
+      // Kalkulasi stok terkini: jika saldo DB ada gunakan saldo, jika tidak tambahkan kalkulasi dari transaksi
+      const formattedItems = itemsData.map(i => {
+        const calculatedStock = (i.saldo !== null && i.saldo !== undefined && i.saldo > 0)
+          ? i.saldo 
+          : Math.max(0, (txMap[i.id] || 0));
+        return { ...i, currentStock: calculatedStock };
+      });
+
+      setStats({
+        totalItems: itemsData.length,
+        unitIn,
+        unitOut,
+        totalTx: txData.length
+      });
+      setItems(formattedItems);
+    }
+    setLoading(false);
   }, []);
 
-  const sum = (t) => tx.filter((x) => (x.transaction_type || x.type || '').toLowerCase() === t.toLowerCase()).reduce((n, x) => n + x.quantity, 0);
-  
-  const stats = [
-    { label: 'Total barang', value: items.length, icon: Boxes },
-    { label: 'Unit masuk', value: sum('in'), icon: ArrowDownToLine },
-    { label: 'Unit keluar', value: sum('out'), icon: ArrowUpFromLine },
-    { label: 'Jumlah transaksi', value: tx.length, icon: History },
-  ];
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleUpdateSaldo = async (itemId) => {
+    const newStock = parseInt(editSaldo, 10);
+    if (isNaN(newStock) || newStock < 0) return;
+
+    const { error } = await supabase.from('items').update({ saldo: newStock }).eq('id', itemId);
+    if (!error) {
+      setEditingId(null);
+      loadData();
+    } else {
+      alert('Gagal mengupdate stok: ' + error.message);
+    }
+  };
 
   return (
-    <>
+    <div className="space-y-6">
       <h1 className="text-2xl font-bold">Ringkasan</h1>
-      {error && <p className="alert">{error}</p>}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map(({ label, value, icon: Icon }) => (
-          <div key={label} className="card flex items-center gap-4 p-4">
-            <span className="grid h-11 w-11 place-items-center rounded-md bg-amber-100 text-amber-700"><Icon size={20} /></span>
-            <div><p className="text-2xl font-bold leading-none">{value.toLocaleString('id-ID')}</p><p className="mt-1 text-sm text-stone-500">{label}</p></div>
+
+      {/* Metric Cards */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="card flex items-center gap-3 p-4 bg-white border rounded-xl shadow-sm">
+          <div className="rounded-lg bg-amber-100 p-2 text-amber-700"><Package size={20} /></div>
+          <div>
+            <p className="text-xs font-medium text-stone-500">Total barang</p>
+            <p className="text-xl font-bold">{stats.totalItems.toLocaleString('id-ID')}</p>
           </div>
-        ))}
+        </div>
+
+        <div className="card flex items-center gap-3 p-4 bg-white border rounded-xl shadow-sm">
+          <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700"><ArrowDownRight size={20} /></div>
+          <div>
+            <p className="text-xs font-medium text-stone-500">Unit masuk</p>
+            <p className="text-xl font-bold text-emerald-600">{stats.unitIn.toLocaleString('id-ID')}</p>
+          </div>
+        </div>
+
+        <div className="card flex items-center gap-3 p-4 bg-white border rounded-xl shadow-sm">
+          <div className="rounded-lg bg-rose-100 p-2 text-rose-700"><ArrowUpRight size={20} /></div>
+          <div>
+            <p className="text-xs font-medium text-stone-500">Unit keluar</p>
+            <p className="text-xl font-bold text-rose-600">{stats.unitOut.toLocaleString('id-ID')}</p>
+          </div>
+        </div>
+
+        <div className="card flex items-center gap-3 p-4 bg-white border rounded-xl shadow-sm">
+          <div className="rounded-lg bg-blue-100 p-2 text-blue-700"><History size={20} /></div>
+          <div>
+            <p className="text-xs font-medium text-stone-500">Jumlah transaksi</p>
+            <p className="text-xl font-bold">{stats.totalTx.toLocaleString('id-ID')}</p>
+          </div>
+        </div>
       </div>
-      <section className="card overflow-x-auto">
-        <h2 className="px-4 pt-4 font-semibold">Stok terkini</h2>
-        <table className="mt-2 w-full">
-          <thead className="border-b border-stone-200">
-            <tr>
-              <th className="th">Kode</th>
-              <th className="th">Deskripsi</th>
-              <th className="th">Kategori</th>
-              <th className="th text-right">Stock</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-stone-100">
-            {items.map((i) => (
-              <tr key={i.sku || i.item_code}>
-                <td className="td font-medium">{i.sku || i.item_code}</td>
-                <td className="td">{i.name || i.description}</td>
-                <td className="td">{i.category || i.item_group || '-'}</td>
-                <td className={`td text-right font-semibold ${(i.saldo || 0) <= 10 ? 'text-red-600' : ''}`}>
-                  {i.saldo ?? 0}
-                </td>
+
+      {/* Tabel Stok Terkini */}
+      <div className="card bg-white border rounded-xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-stone-200">
+          <h2 className="font-bold text-lg">Stok terkini</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-stone-50 text-stone-500 border-b">
+              <tr>
+                <th className="p-3">Kode</th>
+                <th className="p-3">Deskripsi</th>
+                <th className="p-3">Kategori</th>
+                <th className="p-3 text-right">Stock</th>
+                <th className="p-3 text-center">Aksi</th>
               </tr>
-            ))}
-            {!items.length && <tr><td className="td text-stone-500" colSpan={4}>Belum ada barang. Tambahkan lewat menu Barang.</td></tr>}
-          </tbody>
-        </table>
-      </section>
-    </>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {loading ? (
+                <tr><td colSpan={5} className="p-4 text-center text-stone-400">Memuat stok barang...</td></tr>
+              ) : items.map((item) => (
+                <tr key={item.id} className="hover:bg-stone-50">
+                  <td className="p-3 font-medium">{item.sku}</td>
+                  <td className="p-3 text-stone-700">{item.name}</td>
+                  <td className="p-3 text-stone-500 text-xs uppercase">{item.category || '-'}</td>
+                  <td className="p-3 text-right font-bold">
+                    {editingId === item.id ? (
+                      <input
+                        type="number"
+                        min="0"
+                        className="input w-20 text-right py-1 px-2 text-sm border rounded"
+                        value={editSaldo}
+                        onChange={(e) => setEditSaldo(e.target.value)}
+                      />
+                    ) : (
+                      <span className={item.currentStock > 0 ? 'text-emerald-700' : 'text-rose-600'}>
+                        {item.currentStock}
+                      </span>
+                    )}
+                  </td>
+                  <td className="p-3 text-center">
+                    {editingId === item.id ? (
+                      <div className="flex justify-center gap-1">
+                        <button onClick={() => handleUpdateSaldo(item.id)} className="p-1 text-emerald-600 hover:bg-emerald-50 rounded" title="Simpan"><Save size={16} /></button>
+                        <button onClick={() => setEditingId(null)} className="p-1 text-stone-400 hover:bg-stone-100 rounded" title="Batal"><X size={16} /></button>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setEditingId(item.id); setEditSaldo(item.currentStock); }} className="p-1 text-stone-400 hover:text-amber-600 rounded" title="Edit Stok Manual">
+                        <Edit2 size={16} />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }
