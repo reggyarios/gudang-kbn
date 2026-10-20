@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import JsBarcode from 'jsbarcode';
 import JSZip from 'jszip';
@@ -11,11 +11,7 @@ export default function BarcodeGeneratorPage() {
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
-  useEffect(() => {
-    fetchItems();
-  }, []);
-
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('items')
@@ -25,9 +21,23 @@ export default function BarcodeGeneratorPage() {
       setItems(data);
     }
     setLoading(false);
-  };
+  }, []);
 
-  // Fungsi untuk mendownload seluruh barcode dalam bentuk file ZIP
+  useEffect(() => {
+    fetchItems();
+
+    // Setup Realtime Subscription agar otomatis update jika ada barang baru ditambahkan
+    const channel = supabase.channel('items-barcode-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'items' }, () => {
+        fetchItems();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchItems]);
+
   const downloadAllBarcodesAsZip = async () => {
     if (items.length === 0) return;
     setDownloading(true);
@@ -38,7 +48,6 @@ export default function BarcodeGeneratorPage() {
     items.forEach((item) => {
       const canvas = document.createElement('canvas');
       try {
-        // Generate barcode dengan format Code128
         JsBarcode(canvas, item.sku, {
           format: "CODE128",
           width: 2,
@@ -48,10 +57,7 @@ export default function BarcodeGeneratorPage() {
           margin: 10
         });
 
-        // Ambil data base64 dari canvas
         const base64Data = canvas.toDataURL("image/png").replace(/^data:image\/png;base64,/, "");
-        
-        // Buat nama file aman dari karakter khusus
         const safeSku = item.sku.replace(/[/\\?%*:|"<>]/g, '-');
         folder.file(`${safeSku}.png`, base64Data, { base64: true });
       } catch (e) {
@@ -59,7 +65,6 @@ export default function BarcodeGeneratorPage() {
       }
     });
 
-    // Buat file zip dan trigger download di browser
     const content = await zip.generateAsync({ type: "blob" });
     saveAs(content, "barcode-barang-gudang.zip");
     setDownloading(false);
@@ -98,7 +103,6 @@ export default function BarcodeGeneratorPage() {
                 </span>
               </div>
               
-              {/* Preview Barcode Visual di Web */}
               <div className="py-2 flex justify-center w-full bg-stone-50 rounded-lg border border-stone-100 my-1">
                 <BarcodePreview sku={item.sku} />
               </div>
@@ -121,7 +125,6 @@ export default function BarcodeGeneratorPage() {
   );
 }
 
-// Sub-komponen kecil untuk menampilkan preview barcode satuan di card web
 function BarcodePreview({ sku }) {
   useEffect(() => {
     try {
