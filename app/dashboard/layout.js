@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, History, Users, LogOut, Warehouse, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Package, History, Users, LogOut, Warehouse, Menu, X, Barcode } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 
 const nav = [
@@ -10,6 +10,7 @@ const nav = [
   { href: '/dashboard/items', label: 'Barang', icon: Package },
   { href: '/dashboard/transactions', label: 'Transaksi', icon: History },
   { href: '/dashboard/users', label: 'Pengguna', icon: Users },
+  { href: '/dashboard/barcodes', label: 'Cetak Barcode', icon: Barcode },
 ];
 
 export default function DashboardLayout({ children }) {
