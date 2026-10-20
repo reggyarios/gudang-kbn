@@ -36,7 +36,7 @@ export default function TransactionsPage() {
     setBusy(true); setError(''); setInfo('');
     const { data: { user } } = await supabase.auth.getUser();
 
-    // 1. Simpan transaksi ke database
+    // Kirim data transaksi ke database (Trigger SQL akan otomatis mengupdate saldo items)
     const { error: err } = await supabase.from('transactions').insert({
       item_id: parseInt(form.item_id, 10),
       type: form.transaction_type,
@@ -46,24 +46,9 @@ export default function TransactionsPage() {
       created_by: user?.id,
     });
     
-    if (err) {
-      setBusy(false);
-      return setError(err.message);
-    }
-
-    // 2. Ambil saldo/stock saat ini dan update otomatis ke tabel items
-    const { data: itemData } = await supabase.from('items').select('saldo').eq('id', form.item_id).single();
-    if (itemData) {
-      const currentSaldo = itemData.saldo || 0;
-      const qty = parseInt(form.quantity, 10);
-      const newSaldo = form.transaction_type === 'in' 
-        ? currentSaldo + qty 
-        : Math.max(0, currentSaldo - qty);
-
-      await supabase.from('items').update({ saldo: newSaldo }).eq('id', form.item_id);
-    }
-
     setBusy(false);
+    if (err) return setError(err.message);
+    
     setForm({ item_id: '', transaction_type: 'in', quantity: 1, notes: '' });
     load();
   };
